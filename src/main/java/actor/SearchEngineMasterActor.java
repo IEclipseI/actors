@@ -2,9 +2,11 @@ package actor;
 
 import akka.actor.Props;
 import akka.actor.ReceiveTimeout;
+import akka.actor.Scheduler;
 import akka.actor.UntypedActor;
 import engine.SearchEngine;
 import scala.concurrent.duration.Duration;
+import scala.concurrent.duration.FiniteDuration;
 import utils.AggregatorResult;
 import utils.Link;
 import utils.SearchRequest;
@@ -14,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 public class SearchEngineMasterActor extends UntypedActor {
     List<SearchEngine> engines;
@@ -25,7 +28,10 @@ public class SearchEngineMasterActor extends UntypedActor {
         this.engines = engines;
         this.result = new AggregatorResult(new HashMap<>());
         this.futureResult = futureResult;
-        context().setReceiveTimeout(timeout);
+        context().system().scheduler().scheduleOnce(
+                FiniteDuration.create(timeout.toMillis(), TimeUnit.MILLISECONDS),
+                () -> self().tell(new TimeoutExcedeed(), self()),
+                context().system().dispatcher());
     }
 
     @Override
@@ -40,7 +46,7 @@ public class SearchEngineMasterActor extends UntypedActor {
                 if (resultMap.size() == engines.size()) {
                     finish();
                 }
-            } else if (o instanceof ReceiveTimeout) {
+            } else if (o instanceof TimeoutExcedeed) {
                 finish();
             }
         }
